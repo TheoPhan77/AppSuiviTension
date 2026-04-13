@@ -5,11 +5,8 @@ plugins {
 
 android {
     namespace = "com.example.appsuivitension"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    // Mise à jour vers l'API 36 comme demandé par les erreurs
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.appsuivitension"
@@ -42,12 +39,19 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    
+    // Dépendances spécifiques au projet
+    implementation(libs.gson)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.mpandroidchart)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
