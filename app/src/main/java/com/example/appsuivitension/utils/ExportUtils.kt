@@ -11,7 +11,7 @@ import java.util.*
 object ExportUtils {
     fun exportToCsv(context: Context, records: List<BloodPressureRecord>) {
         val fileName = "suivi_tension_${System.currentTimeMillis()}.csv"
-        val file = File(context.cacheDir, fileName)
+        val file = File(context.externalCacheDir, fileName)
         
         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         

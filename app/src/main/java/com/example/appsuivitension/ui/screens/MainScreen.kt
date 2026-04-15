@@ -47,6 +47,8 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
     var alertData by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     
+    var selectedRecordForDetails by remember { mutableStateOf<BloodPressureRecord?>(null) }
+    
     val context = LocalContext.current
     val dateFormatShort = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
 
@@ -99,7 +101,9 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
 
             Box(modifier = Modifier.fillMaxWidth().height(250.dp).padding(horizontal = 16.dp)) {
                 if (filteredRecords.isNotEmpty()) {
-                    TensionChart(filteredRecords, dateFormatShort)
+                    TensionChart(filteredRecords, dateFormatShort) { record ->
+                        selectedRecordForDetails = record
+                    }
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Aucune mesure enregistrée", style = MaterialTheme.typography.bodyLarge)
@@ -119,7 +123,7 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
                 contentPadding = PaddingValues(bottom = 100.dp, start = 16.dp, end = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(records, key = { it.id }) { record ->
+                items(items = records, key = { it.id }) { record ->
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
                             if (it == SwipeToDismissBoxValue.EndToStart) {
@@ -192,6 +196,13 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
             SettingsDialog(onDismiss = { showSettings = false })
         }
 
+        if (selectedRecordForDetails != null) {
+            DetailsDialog(
+                record = selectedRecordForDetails!!,
+                onDismiss = { selectedRecordForDetails = null }
+            )
+        }
+
         alertData?.let { (title, message) ->
             AlertDialog(
                 onDismissRequest = { alertData = null },
@@ -222,10 +233,15 @@ fun FilterButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
 }
 
 @Composable
-fun TensionChart(records: List<BloodPressureRecord>, dateFormat: SimpleDateFormat) {
+fun TensionChart(
+    records: List<BloodPressureRecord>,
+    dateFormat: SimpleDateFormat,
+    onPointClick: (BloodPressureRecord) -> Unit
+) {
+    val context = LocalContext.current
     AndroidView(
-        factory = { context ->
-            LineChart(context).apply {
+        factory = { ctx ->
+            LineChart(ctx).apply {
                 description.isEnabled = false
                 setTouchEnabled(true)
                 setPinchZoom(true)
@@ -236,6 +252,18 @@ fun TensionChart(records: List<BloodPressureRecord>, dateFormat: SimpleDateForma
                 axisLeft.setDrawGridLines(true)
                 legend.isEnabled = true
                 legend.textSize = 12f
+                
+                setOnChartValueSelectedListener(object : com.github.mikephil.charting.listener.OnChartValueSelectedListener {
+                    override fun onValueSelected(e: Entry?, h: com.github.mikephil.charting.highlight.Highlight?) {
+                        e?.let {
+                            val index = it.x.toInt()
+                            if (index in records.indices) {
+                                onPointClick(records[index])
+                            }
+                        }
+                    }
+                    override fun onNothingSelected() {}
+                })
             }
         },
         update = { chart ->
@@ -256,20 +284,51 @@ fun TensionChart(records: List<BloodPressureRecord>, dateFormat: SimpleDateForma
                 setCircleColor(android.graphics.Color.RED)
                 lineWidth = 3f
                 setDrawValues(false)
-                setCircleRadius(4f)
+                setCircleRadius(5f)
+                setDrawCircleHole(false)
+                highlightLineWidth = 2f
+                highLightColor = android.graphics.Color.GRAY
             }
             val diaDataSet = LineDataSet(diaEntries, "DIA").apply {
                 color = android.graphics.Color.BLUE
                 setCircleColor(android.graphics.Color.BLUE)
                 lineWidth = 3f
                 setDrawValues(false)
-                setCircleRadius(4f)
+                setCircleRadius(5f)
+                setDrawCircleHole(false)
+                highlightLineWidth = 2f
+                highLightColor = android.graphics.Color.GRAY
             }
 
             chart.data = LineData(sysDataSet, diaDataSet)
             chart.invalidate()
         },
         modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
+fun DetailsDialog(record: BloodPressureRecord, onDismiss: () -> Unit) {
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Détails de la mesure", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Date : ${dateFormat.format(Date(record.timestamp))}")
+                Text("Tension : ${record.systolic}/${record.diastolic} mmHg", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Pouls : ${record.pulse} bpm")
+                if (record.notes.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text("Notes :", fontWeight = FontWeight.Bold)
+                    Text(record.notes)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Fermer") }
+        }
     )
 }
 

@@ -35,3 +35,4 @@ mpandroidchart = { group = "com.github.PhilJay", name = "MPAndroidChart", versio
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
