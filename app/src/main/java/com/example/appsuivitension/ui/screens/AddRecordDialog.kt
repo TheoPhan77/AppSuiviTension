@@ -31,7 +31,7 @@ enum class AddStep {
 @Composable
 fun AddRecordDialog(
     onDismiss: () -> Unit,
-    onConfirm: (systolic: Int, diastolic: Int, pulse: Int, notes: String) -> Unit
+    onConfirm: (systolic: Int, diastolic: Int, pulse: Int, notes: String, timestamp: Long) -> Unit
 ) {
     var currentStep by remember { mutableStateOf(AddStep.INTRO) }
     
@@ -214,7 +214,7 @@ fun AddRecordDialog(
                                         val s = systolic.toIntOrNull() ?: 0
                                         val d = diastolic.toIntOrNull() ?: 0
                                         val p = pulse.toIntOrNull() ?: 0
-                                        onConfirm(s, d, p, notes)
+                                        onConfirm(s, d, p, notes, calendar.timeInMillis)
                                     },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
                                     shape = RoundedCornerShape(12.dp)
@@ -242,13 +242,21 @@ fun ValueInputRow(label: String, value: String, unit: String, onValueChange: (St
             OutlinedTextField(
                 value = value,
                 onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) onValueChange(it) },
-                modifier = Modifier.width(80.dp),
+                modifier = Modifier.width(100.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
-                textStyle = LocalTextStyle.current.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                textStyle = LocalTextStyle.current.copy(
+                    fontSize = 24.sp, 
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                )
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(unit, fontSize = 16.sp)
+            Text(unit, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

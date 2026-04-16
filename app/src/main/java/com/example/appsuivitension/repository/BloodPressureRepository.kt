@@ -13,25 +13,30 @@ class BloodPressureRepository(context: Context) {
     private val gson = Gson()
     private val key = "records"
 
-    fun getAllRecords(): List<BloodPressureRecord> {
+    fun getAllRecords(userId: String): List<BloodPressureRecord> {
+        val allRecords = getAll()
+        return allRecords.filter { it.userId == userId }
+    }
+
+    private fun getAll(): List<BloodPressureRecord> {
         val json = sharedPreferences.getString(key, null) ?: return emptyList()
         val type = object : TypeToken<List<BloodPressureRecord>>() {}.type
         return gson.fromJson(json, type) ?: emptyList()
     }
 
     fun addRecord(record: BloodPressureRecord) {
-        val records = getAllRecords().toMutableList()
+        val records = getAll().toMutableList()
         records.add(record)
         saveRecords(records)
     }
 
     fun deleteRecord(recordId: String) {
-        val records = getAllRecords().filter { it.id != recordId }
+        val records = getAll().filter { it.id != recordId }
         saveRecords(records)
     }
 
     fun updateRecord(updatedRecord: BloodPressureRecord) {
-        val records = getAllRecords().toMutableList()
+        val records = getAll().toMutableList()
         val index = records.indexOfFirst { it.id == updatedRecord.id }
         if (index != -1) {
             records[index] = updatedRecord

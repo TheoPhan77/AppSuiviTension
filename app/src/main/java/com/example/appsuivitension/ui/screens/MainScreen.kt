@@ -33,6 +33,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.appsuivitension.model.BloodPressureRecord
 import com.example.appsuivitension.utils.ExportUtils
+import com.example.appsuivitension.utils.AuthManager
 import com.example.appsuivitension.utils.SettingsManager
 import com.example.appsuivitension.utils.ThemeMode
 import com.example.appsuivitension.viewmodel.BloodPressureViewModel
@@ -50,7 +51,8 @@ import java.util.*
 fun MainScreen(
     viewModel: BloodPressureViewModel = viewModel(),
     onThemeChange: (ThemeMode) -> Unit = {},
-    onReminderChange: () -> Unit = {}
+    onReminderChange: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val records by viewModel.records.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -61,7 +63,13 @@ fun MainScreen(
 
     var selectedRecordForDetails by remember { mutableStateOf<BloodPressureRecord?>(null) }
 
+    LaunchedEffect(Unit) {
+        viewModel.loadRecords()
+    }
+
     val context = LocalContext.current
+    val authManager = remember { AuthManager(context) }
+    val userLogin = authManager.getActiveUserLogin() ?: "Utilisateur"
     val dateFormatShort = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
 
     val filteredRecords = remember(records, selectedRange) {
@@ -72,7 +80,7 @@ fun MainScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("MON SUIVI TENSION", fontWeight = FontWeight.Black, fontSize = 22.sp) },
+                title = { Text("Bonjour $userLogin !", fontWeight = FontWeight.Black, fontSize = 22.sp) },
                 actions = {
                     IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Paramètres", modifier = Modifier.size(30.dp))
@@ -184,8 +192,8 @@ fun MainScreen(
         if (showAddDialog) {
             AddRecordDialog(
                 onDismiss = { showAddDialog = false },
-                onConfirm = { sys, dia, pulse, notes ->
-                    viewModel.addRecord(sys, dia, pulse, notes)
+                onConfirm = { sys, dia, pulse, notes, timestamp ->
+                    viewModel.addRecord(sys, dia, pulse, notes, timestamp)
                     val alert = getAlertMessage(sys, dia, pulse)
                     if (alert != null) {
                         alertData = alert
@@ -211,7 +219,11 @@ fun MainScreen(
             SettingsDialog(
                 onDismiss = { showSettings = false },
                 onThemeChange = onThemeChange,
-                onReminderChange = onReminderChange
+                onReminderChange = onReminderChange,
+                onLogout = {
+                    showSettings = false
+                    onLogout()
+                }
             )
         }
 
@@ -427,7 +439,8 @@ fun DetailsDialog(record: BloodPressureRecord, onDismiss: () -> Unit) {
 fun SettingsDialog(
     onDismiss: () -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
-    onReminderChange: () -> Unit
+    onReminderChange: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val settingsManager = remember { SettingsManager(context) }
@@ -523,6 +536,15 @@ fun SettingsDialog(
                 }
 
                 HorizontalDivider()
+
+                Button(
+                    onClick = onLogout,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("DÉCONNEXION", fontWeight = FontWeight.Bold)
+                }
 
                 Text("L'export génère un fichier CSV que vous pouvez envoyer par email à votre médecin.", fontSize = 14.sp, color = Color.Gray)
             }

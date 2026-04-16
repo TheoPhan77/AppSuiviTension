@@ -16,6 +16,7 @@ class ReminderWorker(context: Context, workerParams: WorkerParameters) : Worker(
     }
 
     private fun sendNotification() {
+        val userLogin = inputData.getString("userLogin") ?: "Utilisateur"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "daily_reminder"
 
@@ -25,7 +26,7 @@ class ReminderWorker(context: Context, workerParams: WorkerParameters) : Worker(
         }
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setContentTitle("Suivi Tensionnel")
+            .setContentTitle("Bonjour $userLogin !")
             .setContentText("Prenez votre tension")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setAutoCancel(true)
