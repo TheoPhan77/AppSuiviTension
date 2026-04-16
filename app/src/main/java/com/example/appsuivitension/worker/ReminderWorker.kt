@@ -26,7 +26,7 @@ class ReminderWorker(context: Context, workerParams: WorkerParameters) : Worker(
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle("Suivi Tensionnel")
-            .setContentText("C'est l'heure de prendre votre tension !")
+            .setContentText("Prenez votre tension")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

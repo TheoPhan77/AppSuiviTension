@@ -1,13 +1,17 @@
 package com.example.appsuivitension.ui.screens
 
+import android.app.TimePickerDialog
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +33,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.appsuivitension.model.BloodPressureRecord
 import com.example.appsuivitension.utils.ExportUtils
+import com.example.appsuivitension.utils.SettingsManager
+import com.example.appsuivitension.utils.ThemeMode
 import com.example.appsuivitension.viewmodel.BloodPressureViewModel
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
@@ -39,7 +47,11 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
+fun MainScreen(
+    viewModel: BloodPressureViewModel = viewModel(),
+    onThemeChange: (ThemeMode) -> Unit = {},
+    onReminderChange: () -> Unit = {}
+) {
     val records by viewModel.records.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var recordToEdit by remember { mutableStateOf<BloodPressureRecord?>(null) }
@@ -72,13 +84,16 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            LargeFloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                modifier = Modifier.size(80.dp)
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier
+                    .size(80.dp)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Ajouter", modifier = Modifier.size(40.dp))
+                Icon(Icons.Default.Add, contentDescription = "Ajouter", modifier = Modifier.size(48.dp))
             }
         }
     ) { innerPadding ->
@@ -193,7 +208,11 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
         }
 
         if (showSettings) {
-            SettingsDialog(onDismiss = { showSettings = false })
+            SettingsDialog(
+                onDismiss = { showSettings = false },
+                onThemeChange = onThemeChange,
+                onReminderChange = onReminderChange
+            )
         }
 
         if (selectedRecordForDetails != null) {
@@ -219,16 +238,24 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
 
 @Composable
 fun FilterButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
+    OutlinedButton(
         onClick = onClick,
-        modifier = modifier.height(50.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+        modifier = modifier.height(56.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        ),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Text(text, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(
+            text = text,
+            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+            fontSize = 18.sp
+        )
     }
 }
 
@@ -242,6 +269,9 @@ fun TensionChart(
     val currentRecords by rememberUpdatedState(records)
     val currentOnPointClick by rememberUpdatedState(onPointClick)
 
+    val contentColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant.toArgb()
+
     AndroidView(
         factory = { ctx ->
             LineChart(ctx).apply {
@@ -250,13 +280,26 @@ fun TensionChart(
                 setPinchZoom(false) // Désactivé pour prioriser le clic sur les points
                 setDoubleTapToZoomEnabled(false)
 
-                xAxis.position = XAxis.XAxisPosition.BOTTOM
-                xAxis.setDrawGridLines(false)
-                xAxis.granularity = 1f
+                xAxis.apply {
+                    position = XAxis.XAxisPosition.BOTTOM
+                    setDrawGridLines(false)
+                    granularity = 1f
+                    textColor = contentColor
+                }
+
                 axisRight.isEnabled = false
-                axisLeft.setDrawGridLines(true)
-                legend.isEnabled = true
-                legend.textSize = 12f
+
+                axisLeft.apply {
+                    setDrawGridLines(true)
+                    textColor = contentColor
+                    gridColor = outlineColor
+                }
+
+                legend.apply {
+                    isEnabled = true
+                    textSize = 12f
+                    textColor = contentColor
+                }
 
                 // Augmente la zone de détection pour faciliter le clic sur mobile
                 maxHighlightDistance = 40f
@@ -275,6 +318,11 @@ fun TensionChart(
             }
         },
         update = { chart ->
+            chart.xAxis.textColor = contentColor
+            chart.axisLeft.textColor = contentColor
+            chart.axisLeft.gridColor = outlineColor
+            chart.legend.textColor = contentColor
+
             val sysEntries = records.mapIndexed { index, r -> Entry(index.toFloat(), r.systolic.toFloat()) }
             val diaEntries = records.mapIndexed { index, r -> Entry(index.toFloat(), r.diastolic.toFloat()) }
 
@@ -376,18 +424,106 @@ fun DetailsDialog(record: BloodPressureRecord, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun SettingsDialog(onDismiss: () -> Unit) {
-    var reminderEnabled by remember { mutableStateOf(true) }
+fun SettingsDialog(
+    onDismiss: () -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
+    onReminderChange: () -> Unit
+) {
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    
+    var reminderEnabled by remember { mutableStateOf(settingsManager.reminderEnabled) }
+    var reminderHour by remember { mutableIntStateOf(settingsManager.reminderHour) }
+    var reminderMinute by remember { mutableIntStateOf(settingsManager.reminderMinute) }
+    var themeMode by remember { mutableStateOf(settingsManager.themeMode) }
+
+    val timePickerDialog = remember {
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                reminderHour = hour
+                reminderMinute = minute
+                settingsManager.reminderHour = hour
+                settingsManager.reminderMinute = minute
+                onReminderChange()
+            },
+            reminderHour,
+            reminderMinute,
+            true
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Paramètres", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Rappel quotidien (20h)", modifier = Modifier.weight(1f), fontSize = 18.sp)
-                    Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+                // Rappel Quotidien
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Rappel quotidien (${String.format("%02dh%02d", reminderHour, reminderMinute)})",
+                            modifier = Modifier.weight(1f),
+                            fontSize = 18.sp
+                        )
+                        Switch(
+                            checked = reminderEnabled,
+                            onCheckedChange = {
+                                reminderEnabled = it
+                                settingsManager.reminderEnabled = it
+                                onReminderChange()
+                            }
+                        )
+                    }
+                    if (reminderEnabled) {
+                        TextButton(onClick = { timePickerDialog.show() }) {
+                            Text("Modifier l'heure du rappel")
+                        }
+                    }
                 }
+
+                HorizontalDivider()
+
+                // Thème
+                Column {
+                    Text("Thème de l'application", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ThemeOption(
+                            text = "Automatique (Système)",
+                            isSelected = themeMode == ThemeMode.SYSTEM,
+                            onClick = {
+                                themeMode = ThemeMode.SYSTEM
+                                onThemeChange(ThemeMode.SYSTEM)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        ThemeOption(
+                            text = "Mode Clair",
+                            isSelected = themeMode == ThemeMode.LIGHT,
+                            onClick = {
+                                themeMode = ThemeMode.LIGHT
+                                onThemeChange(ThemeMode.LIGHT)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        ThemeOption(
+                            text = "Mode Sombre",
+                            isSelected = themeMode == ThemeMode.DARK,
+                            onClick = {
+                                themeMode = ThemeMode.DARK
+                                onThemeChange(ThemeMode.DARK)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
                 Text("L'export génère un fichier CSV que vous pouvez envoyer par email à votre médecin.", fontSize = 14.sp, color = Color.Gray)
             }
         },
@@ -395,6 +531,30 @@ fun SettingsDialog(onDismiss: () -> Unit) {
             Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Fermer") }
         }
     )
+}
+
+@Composable
+fun ThemeOption(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(56.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        ),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            RadioButton(selected = isSelected, onClick = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text, fontSize = 18.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+        }
+    }
 }
 
 fun getAlertMessage(sys: Int, dia: Int, pulse: Int): Pair<String, String>? {
@@ -431,12 +591,29 @@ fun RecordItem(
     val isHighPressure = record.systolic > 180 || record.diastolic > 120
     val isPulseAlert = record.pulse < 50 || record.pulse > 120
 
+    val pulseColor = if (isPulseAlert) {
+        Color(0xFFE65100)
+    } else if (isSystemInDarkTheme() || MaterialTheme.colorScheme.surface.luminance() < 0.5f) {
+        Color.LightGray
+    } else {
+        Color.DarkGray
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { },
                 onLongClick = onLongClick
+            )
+            .border(
+                width = 2.dp,
+                color = if (isHighPressure || isPulseAlert) {
+                    Color.Red.copy(alpha = 0.5f)
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                },
+                shape = RoundedCornerShape(12.dp)
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
@@ -467,7 +644,7 @@ fun RecordItem(
                 Text(
                     text = "❤ ${record.pulse} bpm",
                     fontSize = 20.sp,
-                    color = if (isPulseAlert) Color(0xFFE65100) else Color.DarkGray
+                    color = pulseColor
                 )
             }
             IconButton(onClick = onDelete) {
