@@ -46,9 +46,9 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
     var selectedRange by remember { mutableIntStateOf(7) }
     var alertData by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showSettings by remember { mutableStateOf(false) }
-    
+
     var selectedRecordForDetails by remember { mutableStateOf<BloodPressureRecord?>(null) }
-    
+
     val context = LocalContext.current
     val dateFormatShort = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
 
@@ -83,7 +83,7 @@ fun MainScreen(viewModel: BloodPressureViewModel = viewModel()) {
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            
+
             // Filtre de période
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -238,13 +238,18 @@ fun TensionChart(
     dateFormat: SimpleDateFormat,
     onPointClick: (BloodPressureRecord) -> Unit
 ) {
-    val context = LocalContext.current
+    // On utilise rememberUpdatedState pour garantir que le listener a toujours les dernières données
+    val currentRecords by rememberUpdatedState(records)
+    val currentOnPointClick by rememberUpdatedState(onPointClick)
+
     AndroidView(
         factory = { ctx ->
             LineChart(ctx).apply {
                 description.isEnabled = false
                 setTouchEnabled(true)
-                setPinchZoom(true)
+                setPinchZoom(false) // Désactivé pour prioriser le clic sur les points
+                setDoubleTapToZoomEnabled(false)
+
                 xAxis.position = XAxis.XAxisPosition.BOTTOM
                 xAxis.setDrawGridLines(false)
                 xAxis.granularity = 1f
@@ -252,13 +257,16 @@ fun TensionChart(
                 axisLeft.setDrawGridLines(true)
                 legend.isEnabled = true
                 legend.textSize = 12f
-                
+
+                // Augmente la zone de détection pour faciliter le clic sur mobile
+                maxHighlightDistance = 40f
+
                 setOnChartValueSelectedListener(object : com.github.mikephil.charting.listener.OnChartValueSelectedListener {
                     override fun onValueSelected(e: Entry?, h: com.github.mikephil.charting.highlight.Highlight?) {
                         e?.let {
                             val index = it.x.toInt()
-                            if (index in records.indices) {
-                                onPointClick(records[index])
+                            if (index >= 0 && index < currentRecords.size) {
+                                currentOnPointClick(currentRecords[index])
                             }
                         }
                     }
@@ -284,23 +292,26 @@ fun TensionChart(
                 setCircleColor(android.graphics.Color.RED)
                 lineWidth = 3f
                 setDrawValues(false)
-                setCircleRadius(5f)
-                setDrawCircleHole(false)
+                setCircleRadius(6f)
+                setDrawCircleHole(true)
+                circleHoleColor = android.graphics.Color.WHITE
                 highlightLineWidth = 2f
-                highLightColor = android.graphics.Color.GRAY
+                highLightColor = android.graphics.Color.LTGRAY
             }
             val diaDataSet = LineDataSet(diaEntries, "DIA").apply {
                 color = android.graphics.Color.BLUE
                 setCircleColor(android.graphics.Color.BLUE)
                 lineWidth = 3f
                 setDrawValues(false)
-                setCircleRadius(5f)
-                setDrawCircleHole(false)
+                setCircleRadius(6f)
+                setDrawCircleHole(true)
+                circleHoleColor = android.graphics.Color.WHITE
                 highlightLineWidth = 2f
-                highLightColor = android.graphics.Color.GRAY
+                highLightColor = android.graphics.Color.LTGRAY
             }
 
             chart.data = LineData(sysDataSet, diaDataSet)
+            chart.highlightValues(null) // Reset highlight on update
             chart.invalidate()
         },
         modifier = Modifier.fillMaxSize()
@@ -310,19 +321,51 @@ fun TensionChart(
 @Composable
 fun DetailsDialog(record: BloodPressureRecord, onDismiss: () -> Unit) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
-    
+    val alert = getAlertMessage(record.systolic, record.diastolic, record.pulse)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Détails de la mesure", fontWeight = FontWeight.Bold) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text("Détails de la mesure", fontWeight = FontWeight.Bold)
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Date : ${dateFormat.format(Date(record.timestamp))}")
-                Text("Tension : ${record.systolic}/${record.diastolic} mmHg", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Pouls : ${record.pulse} bpm")
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(dateFormat.format(Date(record.timestamp)), style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        Text("Tension", style = MaterialTheme.typography.labelMedium)
+                        Text("${record.systolic}/${record.diastolic} mmHg", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Pouls", style = MaterialTheme.typography.labelMedium)
+                        Text("${record.pulse} bpm", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                    }
+                }
+
+                if (alert != null) {
+                    Surface(
+                        color = if (alert.first == "CRITIQUE") Color(0xFFFFEBEE) else Color(0xFFFFF3E0),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            alert.second,
+                            modifier = Modifier.padding(8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (alert.first == "CRITIQUE") Color.Red else Color(0xFFE65100)
+                        )
+                    }
+                }
+
                 if (record.notes.isNotEmpty()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text("Notes :", fontWeight = FontWeight.Bold)
-                    Text(record.notes)
+                    Text(record.notes, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
@@ -356,9 +399,9 @@ fun SettingsDialog(onDismiss: () -> Unit) {
 
 fun getAlertMessage(sys: Int, dia: Int, pulse: Int): Pair<String, String>? {
     return when {
-        sys > 180 || dia > 120 -> 
+        sys > 180 || dia > 120 ->
             "CRITIQUE" to "Votre tension est très élevée ($sys/$dia). Veuillez contacter les urgences ou votre médecin immédiatement."
-        pulse < 50 || pulse > 120 -> 
+        pulse < 50 || pulse > 120 ->
             "ALERTE POULS" to "Votre rythme cardiaque ($pulse bpm) est anormal. Reposez-vous et reprenez la mesure plus tard."
         else -> null
     }
